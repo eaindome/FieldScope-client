@@ -10,5 +10,5 @@ export const APP_MODE: AppMode = 'dev';
 export const PROD_API_BASE_URL = import.meta.env.DEV ? '/api' : 'http://localhost:5083';
 export const API_BASE_URL = import.meta.env.PROD ? '/api' : 'https://fieldscope-1.onrender.com';
 
-// export const isTestMode = () => APP_MODE === 'test';
+export const isTestMode = () => APP_MODE === 'test';
 export const isDevMode = () => APP_MODE === 'dev';
