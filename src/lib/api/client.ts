@@ -72,7 +72,6 @@ class ApiClient {
 		options: RequestInit = {}
 	): Promise<{ data?: T; error?: string }> {
 		const url = `${this.baseUrl}${endpoint}`;
-		console.log(`baseUrl: ${this.baseUrl}, Making request to: ${url}`);
 		const token = this.getAuthToken();
 
 		const headersToMerge: Record<string, string> = {};
