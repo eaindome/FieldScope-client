@@ -40,7 +40,7 @@ export default defineConfig({
 		],
 		proxy: {
 			'/api': {
-				target: 'https://fieldscope-1.onrender.com',
+				target: 'http://localhost:5083',
 				changeOrigin: true,
 				rewrite: (path) => path.replace(/^\/api/, '')
 			}

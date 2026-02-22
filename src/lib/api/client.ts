@@ -1,4 +1,4 @@
-import { isTestMode, API_BASE_URL } from '$lib/config';
+import { isTestMode, API_BASE_URL, PROD_API_BASE_URL } from '$lib/config';
 import {
 	mockDashboardStats,
 	mockOrganizations,
@@ -30,7 +30,7 @@ export enum ContentStatus {
 class ApiClient {
 	private baseUrl: string;
 
-	constructor(baseUrl: string = API_BASE_URL) {
+	constructor(baseUrl: string = PROD_API_BASE_URL) {
 		this.baseUrl = baseUrl;
 	}
 
@@ -72,6 +72,7 @@ class ApiClient {
 		options: RequestInit = {}
 	): Promise<{ data?: T; error?: string }> {
 		const url = `${this.baseUrl}${endpoint}`;
+		console.log(`baseUrl: ${this.baseUrl}, Making request to: ${url}`);
 		const token = this.getAuthToken();
 
 		const headersToMerge: Record<string, string> = {};
