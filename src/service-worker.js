@@ -10,11 +10,25 @@ const ASSETS = [
 	...files  // everything in `static`
 ];
 
+// Key used to store the app shell HTML for offline navigation fallback
+const APP_SHELL_KEY = '/__app_shell__';
+
 self.addEventListener('install', (event) => {
-	// Create a new cache and add all files to it
 	async function addFilesToCache() {
 		const cache = await caches.open(CACHE);
 		await cache.addAll(ASSETS);
+
+		// Pre-cache the app shell (root HTML) so offline navigation always has
+		// something to serve. On Vercel the HTML is SSR-generated and is NOT
+		// included in `build` / `files`, so we must fetch it explicitly here.
+		try {
+			const shellResponse = await fetch('/', { credentials: 'same-origin' });
+			if (shellResponse.ok) {
+				await cache.put(APP_SHELL_KEY, shellResponse);
+			}
+		} catch {
+			// Already offline during install — shell will be cached on first online visit.
+		}
 	}
 
 	event.waitUntil(addFilesToCache());
@@ -74,26 +88,32 @@ self.addEventListener('fetch', (event) => {
 				// Try network first
 				const response = await fetch(event.request);
 
-				if (response.status === 200) {
-					// Cache successful responses
+				if (response.ok) {
+					// Cache this navigation response for future offline use.
 					runtimeCache.put(event.request, response.clone());
+					// Also keep the app shell fresh with the latest HTML.
+					cache.put(APP_SHELL_KEY, response.clone());
 				}
 
 				return response;
 			} catch {
-				// If network fails, try to serve from cache
+				// Network failed — serve the most specific cached version we have.
+
+				// 1. Exact URL match (user visited this page before while online)
 				const cachedResponse = await runtimeCache.match(event.request);
 				if (cachedResponse) {
 					return cachedResponse;
 				}
 
-				// If not in cache, serve the app shell (index.html)
-				const appShell = await cache.match('/');
+				// 2. App shell — lets SvelteKit's client-side router handle the route
+				const appShell =
+					(await cache.match(APP_SHELL_KEY)) ||
+					(await cache.match('/'));
 				if (appShell) {
 					return appShell;
 				}
 
-				// Last resort: return offline page
+				// 3. Last resort: inline offline page (should rarely be reached)
 				return new Response(
 					`<!DOCTYPE html>
 					<html>

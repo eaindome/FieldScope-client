@@ -14,6 +14,7 @@ import {
 	simulateDelay
 } from '$lib/mock-data';
 import { cacheProjects, getCachedProjects, cacheForms, getCachedForms } from '$lib/offline/cache';
+import { getSubmissionsByProject } from '$lib/offline/submissions';
 
 // Status enums matching server-side definitions
 export enum FormStatus {
@@ -184,23 +185,37 @@ class ApiClient {
 			if (result.data && typeof window !== 'undefined') {
 				// Cache user data in localStorage
 				localStorage.setItem('cachedUser', JSON.stringify(result.data));
+				return result;
+			}
+
+			// request() returned an error (e.g. Vite proxy 500 when offline) — try cache
+			if (!result.data && typeof window !== 'undefined') {
+				const cached = localStorage.getItem('cachedUser');
+				if (cached) {
+					try {
+						// console.log('[FieldScope] Using cached user data (offline / proxy error)');
+						return { data: JSON.parse(cached), fromCache: true };
+					} catch {
+						// Cached value was corrupt — fall through
+					}
+				}
 			}
 
 			return result;
-		} catch (error) {
-			// Network error, try cache
+		} catch {
+			// fetch() itself threw (e.g. DNS failure) — try cache
 			if (typeof window !== 'undefined') {
 				const cached = localStorage.getItem('cachedUser');
 				if (cached) {
 					try {
-						console.log('[FieldScope] Using cached user data (offline)');
+						// console.log('[FieldScope] Using cached user data (offline)');
 						return { data: JSON.parse(cached), fromCache: true };
-					} catch (e) {
+					} catch {
 						// Invalid cached data
 					}
 				}
 			}
-			console.warn('[FieldScope] No cached user data available');
+			// console.warn('[FieldScope] No cached user data available');
 			return { error: 'Unable to get user information' };
 		}
 	}
@@ -489,19 +504,19 @@ class ApiClient {
 			// Network request failed, try cache
 			const cached = await getCachedProjects();
 			if (cached) {
-				console.log('[FieldScope] Using cached projects data (offline)');
+				// console.log('[FieldScope] Using cached projects data (offline)');
 				return { data: cached, error: undefined, fromCache: true };
 			}
 
 			return result; // Return original error
-		} catch (error) {
+		} catch {
 			// Network error, try cache
 			const cached = await getCachedProjects();
 			if (cached) {
-				console.log('[FieldScope] Using cached projects data (offline)');
+				// console.log('[FieldScope] Using cached projects data (offline)');
 				return { data: cached, error: undefined, fromCache: true };
 			}
-			console.warn('[FieldScope] No cached projects available');
+			// console.warn('[FieldScope] No cached projects available');
 			return { error: 'No internet connection and no cached data available' };
 		}
 	}
@@ -529,17 +544,17 @@ class ApiClient {
 			}>(`/projects/${id}`);
 
 			return result;
-		} catch (error) {
+		} catch {
 			// Network error, try to find in cached projects
 			const cached = await getCachedProjects<any>();
 			if (cached) {
 				const project = cached.find((p: any) => p.id === id);
 				if (project) {
-					console.log(`[FieldScope] Using cached project ${id} (offline)`);
+					// console.log(`[FieldScope] Using cached project ${id} (offline)`);
 					return { data: project, fromCache: true };
 				}
 			}
-			console.warn(`[FieldScope] Project ${id} not found in cache`);
+			// console.warn(`[FieldScope] Project ${id} not found in cache`);
 			return { error: 'Project not found and no cached data available' };
 		}
 	}
@@ -750,7 +765,7 @@ class ApiClient {
 			}
 
 			return result;
-		} catch (error) {
+		} catch {
 			// Gracefully handle errors
 			return { data: undefined };
 		}
@@ -913,19 +928,19 @@ class ApiClient {
 			// Network request failed, try cache
 			const cached = await getCachedProjects();
 			if (cached) {
-				console.log('[FieldScope] Using cached agent projects (offline)');
+				// console.log('[FieldScope] Using cached agent projects (offline)');
 				return { data: cached, error: undefined, fromCache: true };
 			}
 
 			return result; // Return original error
-		} catch (error) {
+		} catch {
 			// Network error, try cache
 			const cached = await getCachedProjects();
 			if (cached) {
-				console.log('[FieldScope] Using cached agent projects (offline)');
+				// console.log('[FieldScope] Using cached agent projects (offline)');
 				return { data: cached, error: undefined, fromCache: true };
 			}
-			console.warn('[FieldScope] No cached agent projects available');
+			// console.warn('[FieldScope] No cached agent projects available');
 			return { error: 'No internet connection and no cached data available' };
 		}
 	}
@@ -979,19 +994,19 @@ class ApiClient {
 			// Network request failed, try cache
 			const cached = await getCachedForms(projectId);
 			if (cached) {
-				console.log(`[FieldScope] Using cached forms for project ${projectId} (offline)`);
+				// console.log(`[FieldScope] Using cached forms for project ${projectId} (offline)`);
 				return { data: cached, error: undefined, fromCache: true };
 			}
 
 			return result; // Return original error
-		} catch (error) {
+		} catch {
 			// Network error, try cache
 			const cached = await getCachedForms(projectId);
 			if (cached) {
-				console.log(`[FieldScope] Using cached forms for project ${projectId} (offline)`);
+				// console.log(`[FieldScope] Using cached forms for project ${projectId} (offline)`);
 				return { data: cached, error: undefined, fromCache: true };
 			}
-			console.warn(`[FieldScope] No cached forms available for project ${projectId}`);
+			// console.warn(`[FieldScope] No cached forms available for project ${projectId}`);
 			return { error: 'No internet connection and no cached forms available' };
 		}
 	}
@@ -1309,18 +1324,55 @@ class ApiClient {
 			return { data: [] };
 		}
 
-		return this.request<
-			Array<{
-				id: number;
-				projectId: number;
-				formId: number;
-				formName?: string;
-				answers: Record<string, any>;
-				localSyncId: string;
-				createdAt: string;
-				syncedAt?: string;
-			}>
-		>(`/submissions/project/${projectId}`);
+		// Production: try network first, fall back to IndexedDB
+		try {
+			const result = await this.request<
+				Array<{
+					id: number;
+					projectId: number;
+					formId: number;
+					formName?: string;
+					answers: Record<string, any>;
+					localSyncId: string;
+					createdAt: string;
+					syncedAt?: string;
+				}>
+			>(`/submissions/project/${projectId}`);
+
+			if (result.data) {
+				return result;
+			}
+
+			// API returned an error (e.g. offline 503) — fall back to IDB
+			return await this._localSubmissionsForProject(projectId);
+		} catch {
+			// Network threw — fall back to IDB
+			return await this._localSubmissionsForProject(projectId);
+		}
+	}
+
+	/** Returns local IDB submissions normalised to the server submission shape. */
+	private async _localSubmissionsForProject(projectId: number) {
+		try {
+			const localSubs = await getSubmissionsByProject(projectId);
+			const data = localSubs.flatMap((sub) =>
+				sub.responses.map((resp) => ({
+					id: (sub.remoteId ?? sub.localId) as any,
+					projectId: sub.projectId,
+					formId: resp.formId,
+					answers: resp.answers,
+					localSyncId: sub.localId,
+					createdAt: sub.createdAt,
+					syncedAt: sub.syncedAt,
+					syncStatus: sub.syncStatus,
+					isLocalOnly: !sub.remoteId
+				}))
+			);
+			// console.log(`[FieldScope] Using local IDB submissions for project ${projectId} (offline)`);
+			return { data, fromCache: true };
+		} catch {
+			return { data: [] as any[], fromCache: true };
+		}
 	}
 
 	// Views CRUD
