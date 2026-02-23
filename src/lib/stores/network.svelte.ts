@@ -126,9 +126,9 @@ async function runSync(): Promise<SyncResult | null> {
 
 async function refreshCacheOnReconnect(): Promise<void> {
 	try {
-		// Refresh projects cache
-		await api.getProjects();
-		console.log('[FieldScope] Cache refreshed: projects');
+		// Refresh agent projects cache (same /projects endpoint, correct for Agent role)
+		await api.getAgentProjects();
+		// console.log('[FieldScope] Cache refreshed: agent projects');
 	} catch (err) {
 		console.error('[FieldScope] Failed to refresh cache on reconnect:', err);
 	}

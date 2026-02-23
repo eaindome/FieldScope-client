@@ -3,7 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { api } from '$lib/api/client';
-	import { createSubmission } from '$lib/offline/submissions';
+	import { createSubmission, getSubmission } from '$lib/offline/submissions';
 	import { network } from '$lib/stores/network.svelte';
 	import Button from '$lib/components/ui/button.svelte';
 	import Card from '$lib/components/ui/card.svelte';
@@ -87,22 +87,43 @@
 
 			// If in edit mode, load existing submission
 			if (isEditMode && submissionId) {
-				const result = await api.getProjectSubmissions(projectId);
-				if ('data' in result && result.data) {
-					const rawSubmissions = result.data || [];
-					const submission = rawSubmissions.find((s: any) => s.id === parseInt(submissionId));
+				// Detect whether this is a local UUID (offline) or a numeric server ID
+				const isNumericId = /^\d+$/.test(submissionId);
 
-					if (submission) {
-						existingSubmission = submission;
-						// Parse answers if they're a JSON string
-						const parsedAnswers = typeof submission.answers === 'string'
-							? JSON.parse(submission.answers)
-							: submission.answers;
-						answers = { ...parsedAnswers };
+				if (!isNumericId) {
+					// UUID-format localId: load directly from IndexedDB
+					const localSub = await getSubmission(submissionId);
+					if (localSub) {
+						existingSubmission = localSub;
+						const targetResp = localSub.responses.find((r) => r.formId === formId);
+						answers = { ...(targetResp?.answers ?? {}) };
 					} else {
 						error = 'Submission not found';
 						loading = false;
 						return;
+					}
+				} else {
+					// Numeric server ID: fetch from API (falls back to IDB when offline)
+					const result = await api.getProjectSubmissions(projectId);
+					if ('data' in result && result.data) {
+						const rawSubmissions = result.data || [];
+						const submission = rawSubmissions.find(
+							(s: any) =>
+								s.id === parseInt(submissionId) || s.localSyncId === submissionId
+						);
+
+						if (submission) {
+							existingSubmission = submission;
+							const parsedAnswers =
+								typeof submission.answers === 'string'
+									? JSON.parse(submission.answers)
+									: submission.answers;
+							answers = { ...parsedAnswers };
+						} else {
+							error = 'Submission not found';
+							loading = false;
+							return;
+						}
 					}
 				}
 			}

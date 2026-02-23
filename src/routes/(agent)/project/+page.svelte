@@ -23,14 +23,9 @@
 		loading = true;
 		error = null;
 
-		// Load current user
-		const { data: userData, error: userError } = await api.getCurrentUser();
-		if (userError) {
-			error = userError;
-			loading = false;
-			return;
-		}
-		currentUser = userData;
+		// Load current user — non-fatal; projects can still be shown from cache
+		const { data: userData } = await api.getCurrentUser();
+		currentUser = userData ?? null;
 
 		// Load projects assigned to agent
 		const { data: projectsData, error: projectsError } = await api.getAgentProjects();

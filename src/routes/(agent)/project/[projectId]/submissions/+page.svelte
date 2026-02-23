@@ -3,6 +3,8 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { api } from '$lib/api/client';
+	import { getSubmissionsByProject, network } from '$lib/offline';
+	import type { LocalSubmission } from '$lib/offline';
 	import Button from '$lib/components/ui/button.svelte';
 	import Card from '$lib/components/ui/card.svelte';
 	import Badge from '$lib/components/ui/badge.svelte';
@@ -31,11 +33,28 @@
 		await loadData();
 	});
 
+	// ─── Normalise a LocalSubmission (IDB) into the shape the UI expects ─────────
+	function normalizeLocalSubmissions(localSubs: LocalSubmission[]) {
+		return localSubs.flatMap((sub) =>
+			sub.responses.map((resp) => ({
+				id: sub.remoteId ?? (sub.localId as any),
+				projectId: sub.projectId,
+				formId: resp.formId,
+				answers: resp.answers,
+				localSyncId: sub.localId,
+				createdAt: sub.createdAt,
+				syncedAt: sub.syncedAt,
+				syncStatus: sub.syncStatus,
+				isLocalOnly: !sub.remoteId
+			}))
+		);
+	}
+
 	async function loadData() {
 		loading = true;
 		error = null;
 
-		// Load project details
+		// Load project details — getAgentProjects() uses IDB cache when offline
 		const { data: projectsData, error: projectsError } = await api.getAgentProjects();
 		if (projectsError) {
 			error = projectsError;
@@ -50,29 +69,60 @@
 			return;
 		}
 
-		// Load forms for this project
+		// Load forms for this project — getProjectForms() uses IDB cache when offline
 		const { data: formsData, error: formsError } = await api.getProjectForms(projectId);
 		if (formsError) {
 			error = formsError;
 			loading = false;
 			return;
 		}
-		// Filter to only show published forms (exclude draft)
+		// Filter published forms: handle both string 'Published' and numeric 1 (FormStatus.Published)
 		const allForms = formsData || [];
-		forms = allForms.filter((f: any) => f.status === 'Published');
+		forms = allForms.filter((f: any) => f.status === 'Published' || f.status === 1);
 
-		// Load submissions
-		const result = await api.getProjectSubmissions(projectId);
-		if ('error' in result && result.error) {
-			error = result.error;
-		} else if ('data' in result) {
-			const rawSubmissions = result.data || [];
-			// Parse answers JSON string to object
-			submissions = rawSubmissions.map((sub: any) => ({
-				...sub,
-				answers: typeof sub.answers === 'string' ? JSON.parse(sub.answers) : sub.answers,
-				sectionScores: sub.sectionScores && typeof sub.sectionScores === 'string' ? JSON.parse(sub.sectionScores) : sub.sectionScores
-			}));
+		// Load submissions ─────────────────────────────────────────────────────────
+		if (network.online) {
+			// Online: try server, merge local pending submissions on top
+			const result = await api.getProjectSubmissions(projectId);
+			if ('error' in result && result.error) {
+				// API failed despite being online — fall back to IDB
+				const localSubs = await getSubmissionsByProject(projectId);
+				submissions = normalizeLocalSubmissions(localSubs);
+			} else if ('data' in result) {
+				const rawSubmissions = result.data || [];
+				const serverSubs = rawSubmissions.map((sub: any) => ({
+					...sub,
+					answers: typeof sub.answers === 'string' ? JSON.parse(sub.answers) : sub.answers,
+					sectionScores:
+						sub.sectionScores && typeof sub.sectionScores === 'string'
+							? JSON.parse(sub.sectionScores)
+							: sub.sectionScores
+				}));
+
+				// Merge any local submissions that are still pending / errored
+				const localSubs = await getSubmissionsByProject(projectId);
+				const pendingLocal = localSubs
+					.filter((s) => s.syncStatus === 'pending' || s.syncStatus === 'error')
+					.flatMap((sub) =>
+						sub.responses.map((resp) => ({
+							id: sub.localId as any,
+							projectId: sub.projectId,
+							formId: resp.formId,
+							answers: resp.answers,
+							localSyncId: sub.localId,
+							createdAt: sub.createdAt,
+							syncedAt: undefined,
+							syncStatus: sub.syncStatus,
+							isLocalOnly: true
+						}))
+					);
+
+				submissions = [...pendingLocal, ...serverSubs];
+			}
+		} else {
+			// Offline: read entirely from IndexedDB
+			const localSubs = await getSubmissionsByProject(projectId);
+			submissions = normalizeLocalSubmissions(localSubs);
 		}
 
 		loading = false;
@@ -265,7 +315,12 @@
 							{#if submission.syncedAt}
 								<Badge variant="success" class="shrink-0 text-xs">
 									<span>{@html icons.CheckCircle(12)}</span>
-									<span class="ml-1">Saved</span>
+								<span class="ml-1">Synced</span>
+							</Badge>
+						{:else if submission.syncStatus === 'error'}
+							<Badge variant="danger" class="shrink-0 text-xs">
+								<span>{@html icons.AlertCircle(12)}</span>
+								<span class="ml-1">Sync Error</span>
 								</Badge>
 							{:else}
 								<Badge variant="warning" class="shrink-0 text-xs">

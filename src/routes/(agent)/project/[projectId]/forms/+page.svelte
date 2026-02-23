@@ -19,7 +19,7 @@
 	onMount(async () => {
 		// Get projectId from URL params
 		const params = $page.params;
-		projectId = parseInt(params.projectId);
+		projectId = parseInt(params.projectId || '0');
 
 		await loadData();
 	});

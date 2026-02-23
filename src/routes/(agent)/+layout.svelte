@@ -43,9 +43,11 @@
 
 	onMount(async () => {
 		// Load current user
-		const { data, error } = await api.getCurrentUser();
-		if (!error && data) {
-			currentUser = data;
+		const result = await api.getCurrentUser();
+		if ('error' in result && result.error) {
+			// Handle error case
+		} else if (result.data) {
+			currentUser = result.data;
 		}
 	});
 
