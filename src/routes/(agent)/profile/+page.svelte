@@ -22,30 +22,22 @@
 		loading = true;
 		error = null;
 
-		// Load current user
-		const { data: userData, error: userError } = await api.getCurrentUser();
-		if (userError) {
-			error = userError;
-			loading = false;
-			return;
-		}
-		currentUser = userData;
+		// Load current user — non-fatal; profile can render from cached data
+		const userResult = await api.getCurrentUser();
+		if (userResult.data) {
+			const userData = userResult.data;
+			currentUser = userData;
 
-		// Set organization data from API response
-		if (userData && userData.organizationId) {
-			organization = {
-				id: userData.organizationId,
-				name: userData.organizationName || `Organization #${userData.organizationId}`
-			};
+			// Set organization data from API response
+			if (userData.organizationId) {
+				organization = {
+					id: userData.organizationId,
+					name: userData.organizationName || `Organization #${userData.organizationId}`
+				};
+			}
+		} else if ('error' in userResult && userResult.error) {
+			error = userResult.error;
 		}
-
-		// TODO: Load agent statistics when endpoint is implemented on server
-		// if (userData && userData.id) {
-		// 	const { data: statsData } = await api.getAgentStatistics(userData.id);
-		// 	if (statsData) {
-		// 		statistics = statsData;
-		// 	}
-		// }
 
 		loading = false;
 	}
