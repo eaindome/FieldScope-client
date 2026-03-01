@@ -25,6 +25,9 @@
 	let loading = $state(true);
 	let loadingAnalytics = $state(false);
 	let error = $state<string | null>(null);
+	let systemDashboard = $state<any | null>(null);
+	let checkingDashboard = $state(false);
+	let generatingDashboard = $state(false);
 
 	// ─── Pillar name map (pageBreak id → label) ───────────────────────────────
 	// pillarAverages keys are pageBreak field IDs; this maps them to human labels.
@@ -62,7 +65,7 @@
 	const groupByOptions = $derived([
 		{ value: 'agent', label: 'Agent' },
 		...schemaFields
-			.filter((f) => f.type === 'radio' || f.type === 'checkbox' || f.type === 'checkbox' || f.type === 'text')
+			.filter((f) => f.type === 'radio' || f.type === 'checkbox' || f.type === 'text')
 			.slice(0, 6)
 			.map((f) => ({ value: f.id, label: f.label }))
 	]);
@@ -80,9 +83,50 @@
 
 	onMount(async () => {
 		await loadInitialData();
+		await checkForSystemDashboard();
 		await loadAnalytics();
 		await loadTrends();
 	});
+
+	async function checkForSystemDashboard() {
+		if (!formIdFromUrl) return;
+
+		checkingDashboard = true;
+		const { data } = await api.getSystemDashboard(projectId, formIdFromUrl);
+		systemDashboard = data ?? null;
+		checkingDashboard = false;
+	}
+
+	async function generateSystemDashboard() {
+		if (!formIdFromUrl) return;
+
+		generatingDashboard = true;
+		error = null;
+
+		const response = await api.generateSystemDashboard(projectId, formIdFromUrl);
+		const data = response.data;
+		const apiError = 'error' in response ? response.error : undefined;
+
+		if (apiError) {
+			error = apiError;
+			generatingDashboard = false;
+			return;
+		}
+
+		systemDashboard = data ?? null;
+		generatingDashboard = false;
+
+		// Redirect to the dashboard
+		if (systemDashboard) {
+			goto(`/projects/${projectId}/dashboards/${systemDashboard.id}`);
+		}
+	}
+
+	function viewSystemDashboard() {
+		if (systemDashboard) {
+			goto(`/projects/${projectId}/dashboards/${systemDashboard.id}`);
+		}
+	}
 
 	async function loadInitialData() {
 		const { data: projectData } = await api.getProject(projectId);
@@ -408,12 +452,31 @@
 			{/if}
 		</div>
 
-		{#if analytics}
-			<Button onclick={exportToCSV} variant="outline" class="gap-2 shrink-0">
-				{@html icons.Download(16)}
-				<span>Export CSV</span>
-			</Button>
-		{/if}
+		<div class="flex items-center gap-3 shrink-0">
+			{#if systemDashboard}
+				<Button onclick={viewSystemDashboard} variant="default" class="gap-2">
+					{@html icons.Dashboard(16)}
+					<span>View Dashboard</span>
+				</Button>
+			{:else if !checkingDashboard}
+				<Button
+					onclick={generateSystemDashboard}
+					variant="default"
+					loading={generatingDashboard}
+					class="gap-2"
+				>
+					{@html icons.Sparkles(16)}
+					<span>Generate Dashboard</span>
+				</Button>
+			{/if}
+
+			{#if analytics}
+				<Button onclick={exportToCSV} variant="outline" class="gap-2">
+					{@html icons.Download(16)}
+					<span>Export CSV</span>
+				</Button>
+			{/if}
+		</div>
 	</div>
 
 	<!-- ─── Filter Panel ────────────────────────────────────────────────────── -->

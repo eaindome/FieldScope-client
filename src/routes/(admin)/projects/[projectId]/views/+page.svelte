@@ -217,6 +217,26 @@
 			await loadData();
 		}
 	}
+
+	async function cloneView(view: View) {
+		try {
+			const { error: apiError } = await api.cloneView(view.id);
+
+			if (apiError) {
+				error = apiError;
+				setTimeout(() => (error = null), 5000);
+				return;
+			}
+
+			toastType = 'success';
+			toastMessage = 'View cloned successfully! You can now edit the copy.';
+			setTimeout(() => (toastMessage = null), 3000);
+			await loadData();
+		} catch (e) {
+			error = 'Failed to clone view';
+			setTimeout(() => (error = null), 5000);
+		}
+	}
 </script>
 
 <div class="space-y-6">
@@ -276,10 +296,15 @@
 		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
 			{#each views as view}
 				<div class="group bg-white rounded-xl border border-slate-200 hover:border-blue-300 hover:shadow-md transition-all flex flex-col">
-					<!-- Card Header: name + badge -->
+					<!-- Card Header: name + badges -->
 					<div class="px-4 pt-4 pb-2 flex items-start justify-between gap-2">
 						<h3 class="text-sm font-semibold text-slate-900 line-clamp-1 flex-1">{view.name}</h3>
-						<Badge variant="default" class="text-xs shrink-0">{getChartTypeLabel(view)}</Badge>
+						<div class="flex items-center gap-1.5 shrink-0">
+							{#if view.isSystem}
+								<Badge variant="system" class="text-xs">{@html icons.Sparkles(12)} System</Badge>
+							{/if}
+							<Badge variant="default" class="text-xs">{getChartTypeLabel(view)}</Badge>
+						</div>
 					</div>
 
 					<!-- Chart Preview -->
@@ -314,50 +339,64 @@
 									View full chart
 								</span>
 							</div>
-							<!-- Edit view configuration button -->
-							<div class="relative group/edit">
-								<button
-									type="button"
-									onclick={() => editView(view.id)}
-									class="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-								>
-									{@html icons.Edit(16)}
-								</button>
-								<span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 text-xs font-medium bg-slate-800 text-white rounded whitespace-nowrap opacity-0 group-hover/edit:opacity-100 transition-opacity z-10">
-									Edit configuration
-								</span>
-							</div>
+							<!-- Edit view configuration button (disabled for system views) -->
+							{#if !view.isSystem}
+								<div class="relative group/edit">
+									<button
+										type="button"
+										onclick={() => editView(view.id)}
+										class="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+									>
+										{@html icons.Edit(16)}
+									</button>
+									<span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 text-xs font-medium bg-slate-800 text-white rounded whitespace-nowrap opacity-0 group-hover/edit:opacity-100 transition-opacity z-10">
+										Edit configuration
+									</span>
+								</div>
+							{/if}
 							<!-- More actions dropdown -->
 							<DropdownMenu align="right">
 								{#snippet children({ close }: { close: () => void })}
-									<DropdownMenuItem
-										icon={icons.RefreshCw(16)}
-										onclick={() => {
-											duplicateView(view);
-											close();
-										}}
-									>
-										Duplicate
-									</DropdownMenuItem>
-									<DropdownMenuItem
-										icon={(typeof view.status === 'string' ? view.status === 'Published' : view.status === ContentStatus.Published) ? icons.FileText(16) : icons.CheckCircle(16)}
-										onclick={() => {
-											publishView(view);
-											close();
-										}}
-									>
-										{(typeof view.status === 'string' ? view.status === 'Published' : view.status === ContentStatus.Published) ? 'Unpublish' : 'Publish'}
-									</DropdownMenuItem>
-									<DropdownMenuItem
-										icon={icons.Trash(16)}
-										variant="danger"
-										onclick={() => {
-											openDeleteDialog(view);
-											close();
-										}}
-									>
-										Delete
-									</DropdownMenuItem>
+									{#if view.isSystem}
+										<DropdownMenuItem
+											icon={icons.Copy(16)}
+											onclick={() => {
+												cloneView(view);
+												close();
+											}}
+										>
+											Clone (Create Copy)
+										</DropdownMenuItem>
+									{:else}
+										<DropdownMenuItem
+											icon={icons.RefreshCw(16)}
+											onclick={() => {
+												duplicateView(view);
+												close();
+											}}
+										>
+											Duplicate
+										</DropdownMenuItem>
+										<DropdownMenuItem
+											icon={(typeof view.status === 'string' ? view.status === 'Published' : view.status === ContentStatus.Published) ? icons.FileText(16) : icons.CheckCircle(16)}
+											onclick={() => {
+												publishView(view);
+												close();
+											}}
+										>
+											{(typeof view.status === 'string' ? view.status === 'Published' : view.status === ContentStatus.Published) ? 'Unpublish' : 'Publish'}
+										</DropdownMenuItem>
+										<DropdownMenuItem
+											icon={icons.Trash(16)}
+											variant="danger"
+											onclick={() => {
+												openDeleteDialog(view);
+												close();
+											}}
+										>
+											Delete
+										</DropdownMenuItem>
+									{/if}
 								{/snippet}
 							</DropdownMenu>
 						</div>

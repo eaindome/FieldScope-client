@@ -3,7 +3,7 @@
 	import { cn } from '$lib/utils';
 
 	interface BadgeProps {
-		variant?: 'default' | 'success' | 'warning' | 'danger' | 'info';
+		variant?: 'default' | 'success' | 'warning' | 'danger' | 'info' | 'system';
 		class?: string;
 		children: Snippet;
 	}
@@ -15,7 +15,8 @@
 		success: 'bg-green-100 text-green-800',
 		warning: 'bg-yellow-100 text-yellow-800',
 		danger: 'bg-red-100 text-red-800',
-		info: 'bg-blue-100 text-blue-800'
+		info: 'bg-blue-100 text-blue-800',
+		system: 'bg-purple-100 text-purple-800'
 	};
 </script>
 

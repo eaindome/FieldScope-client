@@ -148,6 +148,26 @@
 			await loadDashboards();
 		}
 	}
+
+	async function cloneDashboard(dashboard: Dashboard) {
+		try {
+			const { error: apiError } = await api.cloneDashboard(dashboard.id);
+
+			if (apiError) {
+				error = apiError;
+				setTimeout(() => (error = null), 5000);
+				return;
+			}
+
+			toastType = 'success';
+			toastMessage = 'Dashboard cloned successfully! You can now edit the copy.';
+			setTimeout(() => (toastMessage = null), 3000);
+			await loadDashboards();
+		} catch (e) {
+			error = 'Failed to clone dashboard';
+			setTimeout(() => (error = null), 5000);
+		}
+	}
 </script>
 
 <div class="space-y-6">
@@ -259,50 +279,67 @@
 								<td class="px-6 py-4 whitespace-nowrap">
 									<DropdownMenu align="left">
 										{#snippet children({ close }: { close: () => void })}
-											<DropdownMenuItem
-												icon={icons.Edit(16)}
-												onclick={() => {
-													editDashboard(dashboard.id);
-													close();
-												}}
-											>
-												Edit Dashboard
-											</DropdownMenuItem>
-											<DropdownMenuItem
-												icon={icons.RefreshCw(16)}
-												onclick={() => {
-													duplicateDashboard(dashboard);
-													close();
-												}}
-											>
-												Duplicate
-											</DropdownMenuItem>
-											<DropdownMenuItem
-												icon={(typeof dashboard.status === 'string' ? dashboard.status === 'Published' : dashboard.status === ContentStatus.Published) ? icons.FileText(16) : icons.CheckCircle(16)}
-												onclick={() => {
-													publishDashboard(dashboard);
-													close();
-												}}
-											>
-												{(typeof dashboard.status === 'string' ? dashboard.status === 'Published' : dashboard.status === ContentStatus.Published) ? 'Unpublish' : 'Publish'}
-											</DropdownMenuItem>
-											<DropdownMenuItem
-												icon={icons.Trash(16)}
-												variant="danger"
-												onclick={() => {
-													openDeleteDialog(dashboard);
-													close();
-												}}
-											>
-												Delete
-											</DropdownMenuItem>
+											{#if dashboard.isSystem}
+												<DropdownMenuItem
+													icon={icons.Copy(16)}
+													onclick={() => {
+														cloneDashboard(dashboard);
+														close();
+													}}
+												>
+													Clone (Create Copy)
+												</DropdownMenuItem>
+											{:else}
+												<DropdownMenuItem
+													icon={icons.Edit(16)}
+													onclick={() => {
+														editDashboard(dashboard.id);
+														close();
+													}}
+												>
+													Edit Dashboard
+												</DropdownMenuItem>
+												<DropdownMenuItem
+													icon={icons.RefreshCw(16)}
+													onclick={() => {
+														duplicateDashboard(dashboard);
+														close();
+													}}
+												>
+													Duplicate
+												</DropdownMenuItem>
+												<DropdownMenuItem
+													icon={(typeof dashboard.status === 'string' ? dashboard.status === 'Published' : dashboard.status === ContentStatus.Published) ? icons.FileText(16) : icons.CheckCircle(16)}
+													onclick={() => {
+														publishDashboard(dashboard);
+														close();
+													}}
+												>
+													{(typeof dashboard.status === 'string' ? dashboard.status === 'Published' : dashboard.status === ContentStatus.Published) ? 'Unpublish' : 'Publish'}
+												</DropdownMenuItem>
+												<DropdownMenuItem
+													icon={icons.Trash(16)}
+													variant="danger"
+													onclick={() => {
+														openDeleteDialog(dashboard);
+														close();
+													}}
+												>
+													Delete
+												</DropdownMenuItem>
+											{/if}
 										{/snippet}
 									</DropdownMenu>
 								</td>
 								<td class="px-6 py-4">
-									<div class="text-sm font-medium text-slate-900">{dashboard.name}</div>
+									<div class="flex items-center gap-2">
+										<div class="text-sm font-medium text-slate-900">{dashboard.name}</div>
+										{#if dashboard.isSystem}
+											<Badge variant="system" class="text-xs">{@html icons.Sparkles(12)} System</Badge>
+										{/if}
+									</div>
 									{#if dashboard.description}
-										<div class="text-xs text-slate-500 truncate max-w-xs">
+										<div class="text-xs text-slate-500 truncate max-w-xs mt-1">
 											{dashboard.description}
 										</div>
 									{/if}

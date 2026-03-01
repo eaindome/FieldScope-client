@@ -74,6 +74,9 @@ export interface View {
 	description?: string;
 	definition: string; // JSON stringified ViewDefinition
 	metadata?: string; // JSON stringified extra metadata
+	isSystem?: boolean; // True for auto-generated system views
+	templateType?: string; // Template identifier (e.g., "overall_health")
+	sourceViewId?: number; // Reference to original view if cloned
 	createdAt: string;
 	updatedAt: string;
 }

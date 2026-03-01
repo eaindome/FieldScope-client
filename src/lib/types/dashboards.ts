@@ -20,10 +20,14 @@ export interface DashboardDefinition {
 export interface Dashboard {
 	id: number;
 	projectId: number;
+	formId?: number; // For system dashboards linked to a specific form
 	name: string;
 	description?: string;
 	definition: string; // JSON stringified DashboardDefinition
 	metadata?: string; // JSON stringified extra metadata
+	isSystem?: boolean; // True for auto-generated system dashboards
+	isDefault?: boolean; // True if this is the default dashboard
+	sourceDashboardId?: number; // Reference to original dashboard if cloned
 	createdAt: string;
 	updatedAt: string;
 }
