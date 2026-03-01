@@ -39,6 +39,20 @@
 
 	onMount(() => {
 		loadData();
+
+		// Reload data when page becomes visible (e.g., switching tabs back)
+		const handleVisibilityChange = () => {
+			if (!document.hidden) {
+				loadData();
+			}
+		};
+
+		document.addEventListener('visibilitychange', handleVisibilityChange);
+
+		// Cleanup
+		return () => {
+			document.removeEventListener('visibilitychange', handleVisibilityChange);
+		};
 	});
 
 	async function loadData() {
@@ -123,8 +137,15 @@
 	function getChartData(view: View): ChartData {
 		try {
 			const definition = JSON.parse(view.definition) as ViewDefinition;
-			return aggregateSubmissionData(submissions, definition.config, allFields);
-		} catch {
+			const chartData = aggregateSubmissionData(submissions, definition.config, allFields);
+
+			// Log for debugging (helps identify if submissions are being used)
+			const filteredSubmissions = submissions.filter((s) => s.formId === definition.config.formId);
+			console.log(`[View: ${view.name}] Total submissions: ${submissions.length}, Form submissions: ${filteredSubmissions.length}, Chart labels: ${chartData.labels.length}`);
+
+			return chartData;
+		} catch (e) {
+			console.error(`[View: ${view.name}] Error aggregating data:`, e);
 			return { labels: [], datasets: [] };
 		}
 	}
@@ -246,10 +267,16 @@
 			<h2 class="text-2xl font-bold text-slate-900">Views</h2>
 			<p class="text-slate-600 mt-1">Create charts and visualizations from your form data</p>
 		</div>
-		<Button onclick={createView}>
-			<span>{@html icons.Plus(16)}</span>
-			<span class="ml-2">Create View</span>
-		</Button>
+		<div class="flex items-center gap-2">
+			<Button variant="outline" onclick={loadData} disabled={loading}>
+				<span>{@html icons.RefreshCw(16)}</span>
+				<span class="ml-2">Refresh</span>
+			</Button>
+			<Button onclick={createView}>
+				<span>{@html icons.Plus(16)}</span>
+				<span class="ml-2">Create View</span>
+			</Button>
+		</div>
 	</div>
 
 
@@ -326,19 +353,6 @@
 							<span class="text-xs text-slate-400">{formatDate(view.updatedAt)}</span>
 						</div>
 						<div class="flex items-center gap-0.5">
-							<!-- View full chart button -->
-							<div class="relative group/preview">
-								<button
-									type="button"
-									onclick={() => openPreview(view)}
-									class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-								>
-									{@html icons.Eye(16)}
-								</button>
-								<span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 text-xs font-medium bg-slate-800 text-white rounded whitespace-nowrap opacity-0 group-hover/preview:opacity-100 transition-opacity z-10">
-									View full chart
-								</span>
-							</div>
 							<!-- Edit view configuration button (disabled for system views) -->
 							{#if !view.isSystem}
 								<div class="relative group/edit">
@@ -357,6 +371,15 @@
 							<!-- More actions dropdown -->
 							<DropdownMenu align="right">
 								{#snippet children({ close }: { close: () => void })}
+									<DropdownMenuItem
+										icon={icons.Eye(16)}
+										onclick={() => {
+											openPreview(view);
+											close();
+										}}
+									>
+										View with Live Data
+									</DropdownMenuItem>
 									{#if view.isSystem}
 										<DropdownMenuItem
 											icon={icons.Copy(16)}
@@ -409,13 +432,29 @@
 
 <!-- Preview Dialog -->
 {#if previewView}
+	{@const definition = JSON.parse(previewView.definition) as ViewDefinition}
+	{@const filteredSubs = submissions.filter((s) => s.formId === definition.config.formId)}
 	<Dialog
 		bind:open={previewDialogOpen}
 		onClose={() => (previewDialogOpen = false)}
 		title={previewView.name}
-		description={previewView.description || ''}
+		description={previewView.description || 'View with live submission data'}
+		width="4xl"
 	>
-		<div class="h-96">
+		<div class="mb-3 px-1">
+			<div class="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 flex items-center justify-between">
+				<div class="flex items-center gap-2">
+					<span class="text-blue-700 text-sm font-medium">{@html icons.Info(16)}</span>
+					<span class="text-blue-900 text-sm">
+						Using live data from <strong>{filteredSubs.length}</strong> submission{filteredSubs.length !== 1 ? 's' : ''}
+					</span>
+				</div>
+				{#if filteredSubs.length === 0}
+					<span class="text-xs text-blue-600">No submissions yet for this form</span>
+				{/if}
+			</div>
+		</div>
+		<div class="h-[600px]">
 			<ChartPreview
 				chartType={getChartType(previewView)}
 				chartData={getChartData(previewView)}
@@ -424,10 +463,12 @@
 		</div>
 		<div class="flex justify-end gap-3 pt-4">
 			<Button variant="outline" onclick={() => (previewDialogOpen = false)}>Close</Button>
-			<Button onclick={() => { previewDialogOpen = false; editView(previewView!.id); }}>
-				<span>{@html icons.Edit(16)}</span>
-				<span class="ml-2">Edit View</span>
-			</Button>
+			{#if !previewView.isSystem}
+				<Button onclick={() => { previewDialogOpen = false; editView(previewView!.id); }}>
+					<span>{@html icons.Edit(16)}</span>
+					<span class="ml-2">Edit View</span>
+				</Button>
+			{/if}
 		</div>
 	</Dialog>
 {/if}

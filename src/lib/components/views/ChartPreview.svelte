@@ -14,6 +14,7 @@
 	import WaterfallChart from '$lib/components/charts/WaterfallChart.svelte';
 	import GaugeChart from '$lib/components/charts/GaugeChart.svelte';
 	import ChoroplethChart from '$lib/components/charts/ChoroplethChart.svelte';
+	import SankeyChart from '$lib/components/charts/SankeyChart.svelte';
 	import type { ChartType, ChartData } from '$lib/types/views';
 
 	let {
@@ -38,7 +39,7 @@
 </script>
 
 <div class="h-full flex items-center justify-center {compact ? 'p-2' : 'p-8'} bg-slate-50 rounded-lg">
-	{#if chartData.labels.length === 0 && chartType !== 'scatter'}
+	{#if chartData.labels.length === 0 && !['scatter', 'bubble', 'number', 'gauge', 'sankey'].includes(chartType)}
 		<div class="text-center text-slate-400">
 			{#if !compact}
 				<svg
@@ -252,26 +253,12 @@
 			/>
 		</div>
 	{:else if chartType === 'sankey'}
-		<div class="text-center">
-			<div class="inline-block p-4 bg-blue-50 rounded-full mb-4">
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					class="h-12 w-12 text-blue-400"
-					fill="none"
-					viewBox="0 0 24 24"
-					stroke="currentColor"
-				>
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-					/>
-				</svg>
-			</div>
-			<p class="text-lg font-semibold text-slate-700 mb-2">Sankey Diagram</p>
-			<p class="text-sm text-slate-500">Chart rendering coming soon</p>
-			<p class="text-xs text-slate-400 mt-2">Configuration saved (requires D3.js implementation)</p>
+		<div class="w-full {compact ? 'h-full' : 'h-96'}">
+			<SankeyChart
+				data={chartData.datasets[0]?.data as any || []}
+				{title}
+				height="100%"
+			/>
 		</div>
 	{:else}
 		<div class="text-center text-slate-400">

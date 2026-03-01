@@ -166,17 +166,21 @@
 		if (chartType === 'boxPlot') {
 			return !!selectedField;
 		}
-		// Heatmap needs value field and category field
+		// Heatmap needs X, Y, and value field
 		if (chartType === 'heatmap') {
-			return !!(selectedValueField && selectedCategoryField);
+			return !!(selectedXAxis && selectedYAxis && selectedValueField);
 		}
-		// Tree map and funnel need category and value
-		if (['treeMap', 'funnel'].includes(chartType)) {
+		// Tree map needs category and value
+		if (chartType === 'treeMap') {
 			return !!(selectedCategoryField && selectedValueField);
 		}
-		// Waterfall needs field
+		// Funnel needs category and value field
+		if (chartType === 'funnel') {
+			return !!(selectedCategoryField && selectedValueField);
+		}
+		// Waterfall needs X and Y axes
 		if (chartType === 'waterfall') {
-			return !!selectedField;
+			return !!(selectedXAxis && selectedYAxis);
 		}
 		// Gauge needs a numeric field
 		if (chartType === 'gauge') {
@@ -190,9 +194,9 @@
 		if (chartType === 'number') {
 			return !!selectedField;
 		}
-		// Sankey (not implemented)
+		// Sankey needs source, target, and value
 		if (chartType === 'sankey') {
-			return false;
+			return !!(selectedXAxis && selectedYAxis && selectedValueField);
 		}
 
 		return false;
@@ -211,22 +215,12 @@
 	});
 
 	// Real-time preview updates - only when required fields are selected
+	// Always use mock data for preview to help users design their charts
 	$effect(() => {
 		// Only show preview if we have required fields selected
 		if (hasRequiredFields) {
-			// Try to use real data if available
-			if (submissions.length > 0 && allFields.length > 0) {
-				try {
-					chartData = aggregateSubmissionData(submissions, viewConfig, allFields);
-				} catch (e) {
-					console.error('Error aggregating data, using simulation:', e);
-					// Fall back to simulation on error
-					chartData = generateSimulatedChartData(chartType, viewConfig);
-				}
-			} else {
-				// Use simulated data when no submissions available
-				chartData = generateSimulatedChartData(chartType, viewConfig);
-			}
+			// Always use simulated/mock data for preview
+			chartData = generateSimulatedChartData(chartType, viewConfig);
 		} else {
 			// Reset to empty when fields not selected
 			chartData = { labels: [], datasets: [] };
@@ -428,7 +422,7 @@
 			// Process & Flow
 			else if (chartType === 'funnel') {
 				if (!selectedCategoryField) return 'Stage field is required';
-				if (!selectedField) return 'Value field is required';
+				if (!selectedValueField) return 'Value field is required';
 			} else if (chartType === 'waterfall') {
 				if (!selectedXAxis) return 'Category field is required';
 				if (!selectedYAxis) return 'Value field is required';
@@ -549,7 +543,8 @@
 			<div class="col-span-3 min-h-0">
 				<Card class="h-full flex flex-col">
 					<div class="p-4 border-b border-slate-100 shrink-0">
-						<h3 class="text-sm font-semibold text-slate-700">Live Preview</h3>
+						<h3 class="text-sm font-semibold text-slate-700">Preview</h3>
+						<p class="text-xs text-slate-500 mt-1">Design your chart with mock data. Live data will be shown after saving.</p>
 					</div>
 					<div class="flex-1 min-h-0 p-1">
 						<div class="h-full">

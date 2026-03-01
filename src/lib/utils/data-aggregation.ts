@@ -79,6 +79,11 @@ function aggregateXYChart(
 	config: ViewConfig,
 	allFields: FormField[]
 ): ChartData {
+	// Special handling for time-based grouping (score trends)
+	if (config.xAxis === 'submittedAt' && config.groupBy) {
+		return aggregateTimeSeriesChart(submissions, config, allFields);
+	}
+
 	// Group submissions by X-axis field value
 	const grouped = new Map<string, number[]>();
 
@@ -120,11 +125,87 @@ function aggregateXYChart(
 	};
 }
 
+function aggregateTimeSeriesChart(
+	submissions: any[],
+	config: ViewConfig,
+	allFields: FormField[]
+): ChartData {
+	// Group by time period (month, week, etc.)
+	const grouped = new Map<string, number[]>();
+
+	submissions.forEach((submission) => {
+		const timestamp = submission.createdAt || submission.submittedAt;
+		if (!timestamp) return;
+
+		const date = new Date(timestamp);
+		let periodKey: string;
+
+		// Group by the specified period
+		switch (config.groupBy) {
+			case 'month':
+				periodKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+				break;
+			case 'week':
+				// Get week number
+				const weekNum = Math.ceil(date.getDate() / 7);
+				periodKey = `${date.getFullYear()}-W${weekNum}`;
+				break;
+			case 'day':
+				periodKey = date.toISOString().split('T')[0];
+				break;
+			default:
+				periodKey = date.toISOString().split('T')[0];
+		}
+
+		const value = Number(extractFieldValue(submission, config.field!)) || 0;
+
+		if (!grouped.has(periodKey)) {
+			grouped.set(periodKey, []);
+		}
+		grouped.get(periodKey)!.push(value);
+	});
+
+	// Sort by period key
+	const sortedEntries = Array.from(grouped.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+
+	const labels: string[] = [];
+	const data: number[] = [];
+
+	sortedEntries.forEach(([period, values]) => {
+		labels.push(period);
+
+		if (config.aggregation === 'average') {
+			data.push(values.reduce((a, b) => a + b, 0) / values.length);
+		} else if (config.aggregation === 'sum') {
+			data.push(values.reduce((a, b) => a + b, 0));
+		} else if (config.aggregation === 'count') {
+			data.push(values.length);
+		}
+	});
+
+	return {
+		labels,
+		datasets: [
+			{
+				label: getFieldLabel(config.field!, allFields),
+				data,
+				backgroundColor: config.colors?.[0] || '#3b82f6',
+				borderColor: config.colors?.[0] || '#3b82f6'
+			}
+		]
+	};
+}
+
 function aggregateCategoryChart(
 	submissions: any[],
 	config: ViewConfig,
 	allFields: FormField[]
 ): ChartData {
+	// Special handling for pillar grouping (system views)
+	if (config.groupBy === 'pillar') {
+		return aggregatePillarChart(submissions, config);
+	}
+
 	// Similar to X/Y but for pie/doughnut
 	const grouped = new Map<string, number[]>();
 
@@ -166,7 +247,75 @@ function aggregateCategoryChart(
 	};
 }
 
+function aggregatePillarChart(submissions: any[], config: ViewConfig): ChartData {
+	// Aggregate section scores across submissions
+	const pillarTotals = new Map<string, number[]>();
+
+	submissions.forEach((submission) => {
+		if (submission.sectionScores) {
+			try {
+				const sectionScores =
+					typeof submission.sectionScores === 'string'
+						? JSON.parse(submission.sectionScores)
+						: submission.sectionScores;
+
+				Object.entries(sectionScores).forEach(([pillarId, score]) => {
+					if (!pillarTotals.has(pillarId)) {
+						pillarTotals.set(pillarId, []);
+					}
+					pillarTotals.get(pillarId)!.push(Number(score) || 0);
+				});
+			} catch (e) {
+				console.error('Error parsing section scores:', e);
+			}
+		}
+	});
+
+	const labels: string[] = [];
+	const data: number[] = [];
+
+	pillarTotals.forEach((scores, pillarId) => {
+		labels.push(pillarId); // Could map to human-readable names if needed
+		const average = scores.reduce((a, b) => a + b, 0) / scores.length;
+		data.push(average);
+	});
+
+	return {
+		labels,
+		datasets: [
+			{
+				label: 'Average Score',
+				data,
+				backgroundColor: config.colors?.[0] || '#3b82f6'
+			}
+		]
+	};
+}
+
 function extractFieldValue(submission: any, fieldId: string): string {
+	// Handle special score-related fields (system views)
+	if (fieldId === 'overallScore') {
+		return submission.overallScore !== undefined && submission.overallScore !== null
+			? String(submission.overallScore)
+			: '';
+	}
+
+	if (fieldId === 'healthStatus') {
+		const score = submission.overallScore;
+		if (score == null) return 'No Data';
+		if (score >= 80) return 'Healthy';
+		if (score >= 60) return 'At Risk';
+		return 'Critical';
+	}
+
+	if (fieldId === 'agentName') {
+		return submission.submittedByUser?.name || submission.agentName || 'Unknown';
+	}
+
+	if (fieldId === 'submittedAt' || fieldId === 'createdAt') {
+		return submission.createdAt || submission.submittedAt || '';
+	}
+
 	// Handle both object notation (answers.fieldId) and direct property access
 	if (submission.answers) {
 		const value = submission.answers[fieldId];

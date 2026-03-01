@@ -27,27 +27,27 @@
 	);
 </script>
 
-<div class="flex flex-col p-6" style="height: {height}">
+<div class="flex flex-col p-6 overflow-hidden" style="height: {height}">
 	{#if title}
 		<h3 class="text-lg font-semibold text-slate-700 mb-4 text-center">{title}</h3>
 	{/if}
 
-	<div class="flex-1 flex flex-col justify-center space-y-2">
+	<div class="flex-1 flex flex-col justify-center space-y-2 overflow-y-auto">
 		{#each stages as stage, i}
-			<div class="flex flex-col items-center">
+			<div class="flex flex-col items-center shrink-0">
 				<!-- Funnel segment -->
 				<div
 					class="relative transition-all duration-300 hover:opacity-90"
-					style="width: {stage.percentage}%; min-width: 120px;"
+					style="width: {Math.max(stage.percentage, 30)}%; min-width: 120px; max-width: 100%;"
 				>
 					<div
-						class="py-4 px-6 rounded-lg shadow-md text-white text-center"
+						class="py-3 px-4 rounded-lg shadow-md text-white text-center"
 						style="background-color: {stage.color}"
 					>
-						<div class="font-semibold text-sm mb-1">{stage.label}</div>
-						<div class="text-2xl font-bold">{stage.value.toLocaleString()}</div>
+						<div class="font-semibold text-xs mb-1 truncate">{stage.label}</div>
+						<div class="text-lg font-bold">{stage.value.toLocaleString()}</div>
 						{#if stage.conversionRate}
-							<div class="text-xs mt-1 opacity-90">
+							<div class="text-xs mt-0.5 opacity-90">
 								{stage.conversionRate}% conversion
 							</div>
 						{/if}

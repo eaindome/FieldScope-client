@@ -104,7 +104,7 @@ export function generateSimulatedChartData(
 				labels: [],
 				datasets: [
 					{
-						label: 'Bubble Data',
+						label: config.xAxis && config.yAxis ? `${config.xAxis} vs ${config.yAxis}` : 'Bubble Data',
 						data: [
 							{ x: 10, y: 20, r: 10 },
 							{ x: 15, y: 35, r: 15 },
@@ -112,8 +112,9 @@ export function generateSimulatedChartData(
 							{ x: 30, y: 45, r: 20 },
 							{ x: 40, y: 55, r: 12 },
 							{ x: 50, y: 65, r: 18 }
-						] as any,
-						backgroundColor: colors[0]
+						],
+						backgroundColor: colors[0] + '80',
+						borderColor: colors[0]
 					}
 				]
 			};
@@ -137,9 +138,18 @@ export function generateSimulatedChartData(
 				]
 			};
 
-		case 'histogram':
+		case 'histogram': {
+			// Use bucket size from config or default to 10
+			const bucketSize = config.bucketSize || 10;
+			const numBuckets = 8;
+			const labels = Array.from({ length: numBuckets }, (_, i) => {
+				const start = i * bucketSize;
+				const end = (i + 1) * bucketSize;
+				return `${start}-${end}`;
+			});
+
 			return {
-				labels: ['0-10', '10-20', '20-30', '30-40', '40-50', '50-60', '60-70', '70-80'],
+				labels,
 				datasets: [
 					{
 						label: 'Frequency',
@@ -148,6 +158,7 @@ export function generateSimulatedChartData(
 					}
 				]
 			};
+		}
 
 		case 'boxPlot':
 			return {
@@ -227,16 +238,19 @@ export function generateSimulatedChartData(
 
 		case 'sankey':
 			return {
-				labels: ['Source A', 'Source B', 'Target X', 'Target Y', 'Target Z'],
+				labels: [],
 				datasets: [
 					{
 						label: 'Flow',
 						data: [
-							{ from: 'Source A', to: 'Target X', value: 30 },
-							{ from: 'Source A', to: 'Target Y', value: 20 },
-							{ from: 'Source B', to: 'Target Y', value: 25 },
-							{ from: 'Source B', to: 'Target Z', value: 15 }
-						] as any,
+							{ source: 'Source A', target: 'Target X', value: 30 },
+							{ source: 'Source A', target: 'Target Y', value: 20 },
+							{ source: 'Source B', target: 'Target Y', value: 25 },
+							{ source: 'Source B', target: 'Target Z', value: 15 },
+							{ source: 'Target X', target: 'Final', value: 30 },
+							{ source: 'Target Y', target: 'Final', value: 45 },
+							{ source: 'Target Z', target: 'Final', value: 15 }
+						],
 						backgroundColor: colors
 					}
 				]

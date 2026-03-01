@@ -69,15 +69,17 @@
 			</g>
 		</svg>
 
-		<!-- Value display -->
+		<!-- Value range display -->
 		<div class="absolute inset-x-0 bottom-0 text-center">
-			<div class="text-4xl font-bold" style="color: {color}">{value.toFixed(1)}</div>
-			<div class="text-sm text-slate-500 mt-1">
+			<div class="text-sm text-slate-500">
 				{min} - {max}
 			</div>
 		</div>
 	</div>
 
-	<!-- Percentage -->
-	<div class="text-2xl font-semibold text-slate-600 mt-4">{percentage.toFixed(1)}%</div>
+	<!-- Value and Percentage -->
+	<div class="mt-4 text-center">
+		<div class="text-4xl font-bold" style="color: {color}">{value.toFixed(1)}</div>
+		<div class="text-lg text-slate-600 mt-1">{percentage.toFixed(1)}%</div>
+	</div>
 </div>
